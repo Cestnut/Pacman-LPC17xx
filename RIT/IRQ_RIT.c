@@ -64,14 +64,15 @@ void RIT_IRQHandler (void)
 						srand(LPC_TIM0->TC);
 						start_pressed = 1;
 					}
-				
-					if(game_state == PAUSED){
-						toggle_pause_flag = 1;
-						game_state = RUNNING;
-					}
-					else if(game_state == RUNNING){
-						toggle_pause_flag = 1;
-						game_state = PAUSED;
+					if(game_state != GAME_OVER){ /*To avoid Glitches*/
+						if(game_state == PAUSED){
+							toggle_pause_flag = 1;
+							game_state = RUNNING;
+						}
+						else if(game_state == RUNNING){
+							toggle_pause_flag = 1;
+							game_state = PAUSED;
+						}
 					}
 					break;
 				default:

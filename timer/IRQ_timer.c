@@ -55,6 +55,8 @@ void TIMER0_IRQHandler (void)
 		}
 		
 		if(!(ticks%PACMAN_TICKS)) move_player();
+		if(!(ticks%GHOST_TICKS)) move_ghost();
+
 		if(!(ticks%10) && seconds > 0){
 			seconds--;
 			sprintf(string, "%02d", seconds);

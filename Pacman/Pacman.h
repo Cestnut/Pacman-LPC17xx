@@ -26,7 +26,8 @@ typedef struct player_struct{
 } player_struct;
 
 typedef struct ghost_struct{
-	uint16_t x,y;
+	int x,y;
+	entity hovering_entity;
 } ghost_struct;
 
 
@@ -41,8 +42,7 @@ void init_player();
 void init_ghost();
 
 void move_player();
-void swap_tiles();
-
+void move_ghost();
 
 
 #endif /* end __PACMAN_H */

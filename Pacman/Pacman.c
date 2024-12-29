@@ -125,6 +125,18 @@ typedef struct tiles_list{
 } tiles_list;
 tiles_list empty_tiles, standard_pill_tiles;
 
+typedef struct node{
+	coordinates coordinates;
+	int father;
+} node;
+
+typedef struct node_queue{
+	int head, tail;
+	node nodes[400];
+} node_queue;
+node_queue frontier_queue;
+
+
 void init_board(){
 		int x,y;
 		empty_tiles.index = 0;
@@ -222,12 +234,13 @@ void init_player(){
 	player.lives = 1;
 	player.score = 0;
 	player.status = NORMAL;
-	player.direction = RIGHT;
+	player.direction = STILL;
 }
 
 void init_ghost(){
 	ghost.x = 12;
 	ghost.y = 13;
+	ghost.hovering_entity = SPAWN;
 	board[ghost.x][ghost.y] = GHOST;
 
 }
@@ -262,7 +275,9 @@ void move_player(){
 		case EMPTY: 
 				moved_flag = 1;
 				break;
-		case GHOST: break;//gameover break;
+		case GHOST: 
+				if(player.status == NORMAL) game_state = GAME_OVER;
+				break;//gameover break;
 	}
 	
 	if(new_points!=0){
@@ -283,5 +298,100 @@ void move_player(){
 		
 		player.x = new_x; 
 		player.y = new_y;
+	}
+}
+
+void move_ghost(){
+	int found_node_index = -1;
+	int j, k, z; /*Indexes used to iterate through the frontier*/
+	int already_explored_flag; /*When a valid node has been found, this flag is used to exclude nodes that have already been explored*/
+	int x,y; /*Extracting coordinates from each node to ease manipulation*/
+
+
+	frontier_queue.nodes[0].coordinates.x = ghost.x;
+	frontier_queue.nodes[0].coordinates.y = ghost.y;
+	frontier_queue.nodes[0].father = -1;
+
+	frontier_queue.head = 1;	
+	frontier_queue.tail = 0;
+
+	//For every node Until the queue isn't empty
+	while(frontier_queue.tail < frontier_queue.head && found_node_index == -1){
+		for(j=-1; j<=1 && found_node_index == -1; j++){
+			for(k=-1; k<=1 && found_node_index == -1; k++){
+				if(j != 0 && k != 0) continue; /*So diagonal squares get skipped*/
+				x = frontier_queue.nodes[frontier_queue.tail].coordinates.x + j;
+				y = frontier_queue.nodes[frontier_queue.tail].coordinates.y + k;
+				
+				/*To warp to both ends of the labyrinth*/
+				if(x == -1) x = LABYRINTH_X_SIZE - 1;
+				if(x == LABYRINTH_X_SIZE) x = 0;
+
+				if(board[x][y] != WALL){
+					/*Check if the node has already been explored*/
+					already_explored_flag=0;
+					for(z=0; z<frontier_queue.head; z++){
+						if(frontier_queue.nodes[z].coordinates.x == x && frontier_queue.nodes[z].coordinates.y == y){
+							already_explored_flag = 1;
+							break;
+						}
+					}
+
+					/*If the node hasn't already been explored*/
+					if(!already_explored_flag){
+						/*Insert new node in frontier*/
+						frontier_queue.nodes[frontier_queue.head].coordinates.x = x;
+						frontier_queue.nodes[frontier_queue.head].coordinates.y = y;
+						frontier_queue.nodes[frontier_queue.head].father = frontier_queue.tail;
+
+						if(board[x][y] == PACMAN){
+							found_node_index = frontier_queue.head;
+						}
+					
+						frontier_queue.head++;
+					}
+				}
+			}
+		}
+		frontier_queue.tail++;
+	}
+
+	if(found_node_index != -1){ /*Checks if a node has been found. This should always be the case*/
+		/*If the father's index is 0 it means the father position is the ghost one*/
+		while(frontier_queue.nodes[found_node_index].father != 0){
+			found_node_index = frontier_queue.nodes[found_node_index].father;
+		}
+
+		//Here we have the new coordinates
+		x = frontier_queue.nodes[found_node_index].coordinates.x;
+		y = frontier_queue.nodes[found_node_index].coordinates.y;
+
+		draw_tile(x,y, ghost_pattern);
+		switch (ghost.hovering_entity)
+		{
+		case SPAWN:
+		case EMPTY:
+			draw_tile(ghost.x,ghost.y, empty_pattern);
+			break;
+		case STANDARD_PILL:
+			draw_tile(ghost.x,ghost.y, standard_pill_pattern);
+			break;
+		case POWER_PILL:
+			draw_tile(ghost.x,ghost.y, power_pill_pattern);
+			break;
+		default:
+			break;
+		}
+
+		if(board[x][y] == PACMAN){
+			game_state = GAME_OVER;
+		}
+
+		board[ghost.x][ghost.y] = ghost.hovering_entity;
+		ghost.hovering_entity = board[x][y];
+		board[x][y] = GHOST;		
+
+		ghost.x = x; 
+		ghost.y = y;
 	}
 }
