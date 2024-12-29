@@ -1,0 +1,1 @@
+#define PACMAN_TICKS 3 /* After how many game ticks pacman should move */
