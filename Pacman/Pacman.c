@@ -87,7 +87,7 @@ char pacman_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
 			"bbbbbbbbbb",
 };
 
-char ghost_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
+char ghost_chasing_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
 			"bbbRRRRbbb",
 			"bbRRRRRRRb",
 			"bRWWRRRWWb",
@@ -98,6 +98,19 @@ char ghost_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
 			"RRRRRRRRRR",
 			"RRbRRRRbRR",
 			"RbbbRRbbbR"
+};
+
+char ghost_scared_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
+			"bbbBBBBbbb",
+			"bbBBBBBBBb",
+			"bBWWBBBWWb",
+			"BWWBBBWWBB",
+			"BWWBBBWWBB",
+			"BWWWWBWWWW",
+			"BBWWBBBWWB",
+			"BBBBBBBBBB",
+			"BBbBBBBbBB",
+			"BbbbBBbbbB"
 };
 
 char empty_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
@@ -128,6 +141,7 @@ tiles_list empty_tiles, standard_pill_tiles;
 typedef struct node{
 	coordinates coordinates;
 	int father;
+	int8_t depth;
 } node;
 
 typedef struct node_queue{
@@ -217,7 +231,7 @@ void draw_board(){
 				switch(board[x][y]){
 					case EMPTY: break;
 					case PACMAN: draw_tile(x,y, pacman_pattern); break;
-					case GHOST: draw_tile(x,y, ghost_pattern); break;
+					case GHOST: draw_tile(x,y, ghost_chasing_pattern); break;
 					case WALL: draw_tile(x,y, wall_pattern); break;
 					case STANDARD_PILL: draw_tile(x,y, standard_pill_pattern); break;
 					case POWER_PILL: draw_tile(x,y, power_pill_pattern); break;
@@ -311,6 +325,7 @@ void move_ghost(){
 	frontier_queue.nodes[0].coordinates.x = ghost.x;
 	frontier_queue.nodes[0].coordinates.y = ghost.y;
 	frontier_queue.nodes[0].father = -1;
+	frontier_queue.nodes[0].depth = 0;	
 
 	frontier_queue.head = 1;	
 	frontier_queue.tail = 0;
@@ -343,7 +358,8 @@ void move_ghost(){
 						frontier_queue.nodes[frontier_queue.head].coordinates.x = x;
 						frontier_queue.nodes[frontier_queue.head].coordinates.y = y;
 						frontier_queue.nodes[frontier_queue.head].father = frontier_queue.tail;
-
+						frontier_queue.nodes[frontier_queue.head].depth = frontier_queue.nodes[frontier_queue.tail].depth + 1 ; /*This line sets the depth to that of the father +1*/
+						
 						if(board[x][y] == PACMAN){
 							found_node_index = frontier_queue.head;
 						}
@@ -357,6 +373,26 @@ void move_ghost(){
 	}
 
 	if(found_node_index != -1){ /*Checks if a node has been found. This should always be the case*/
+		
+		/*If the player status is super, the destination of the ghost isnt pacman but the furthest tile from pacman among those at his same depth*/
+		if(player.status==SUPER){
+			int max_distance = 0, tmp_x, tmp_y, tmp_distance;
+			int new_destination_index=found_node_index; /*This is initialized to found node in case no nodes at the same depth are found. (In that case the ghost moves towards pacman)*/
+			for(j=0; j<frontier_queue.head; j++){
+				if(j==found_node_index) continue; /*So ghost doesnt go for pacman position*/
+				if(frontier_queue.nodes[j].depth == frontier_queue.nodes[found_node_index].depth || frontier_queue.nodes[j].depth == frontier_queue.nodes[found_node_index].depth-1){
+					tmp_x = frontier_queue.nodes[j].coordinates.x - player.x;
+					tmp_y = frontier_queue.nodes[j].coordinates.y - player.y;
+					tmp_distance = tmp_x*tmp_x + tmp_y*tmp_y; /*Calculates air distance between pacman and tile */
+		
+					if(tmp_distance>max_distance){
+						max_distance = tmp_distance;
+						new_destination_index = j;
+					}
+				}
+			}
+			found_node_index = new_destination_index;
+		}
 		/*If the father's index is 0 it means the father position is the ghost one*/
 		while(frontier_queue.nodes[found_node_index].father != 0){
 			found_node_index = frontier_queue.nodes[found_node_index].father;
@@ -366,7 +402,9 @@ void move_ghost(){
 		x = frontier_queue.nodes[found_node_index].coordinates.x;
 		y = frontier_queue.nodes[found_node_index].coordinates.y;
 
-		draw_tile(x,y, ghost_pattern);
+		if(player.status==NORMAL) draw_tile(x,y, ghost_chasing_pattern);
+		else if(player.status == SUPER) draw_tile(x,y, ghost_scared_pattern);
+		
 		switch (ghost.hovering_entity)
 		{
 		case SPAWN:
