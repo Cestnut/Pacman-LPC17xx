@@ -12,10 +12,11 @@
 #define POWER_PILLS_NUMBER 6
 #define MAX_TIME 90
 
-typedef enum entity {SPAWN, EMPTY, PACMAN, GHOST, WALL, STANDARD_PILL, POWER_PILL} entity;
+typedef enum tile_type {SPAWN, EMPTY, PACMAN, GHOST, WALL, STANDARD_PILL, POWER_PILL} tile_type;
 typedef enum player_status {NORMAL, SUPER} player_status;
 typedef enum player_direction {STILL, LEFT, RIGHT, UP, DOWN} player_direction;
 typedef enum game_state_enum {GAME_OVER, PAUSED, RUNNING, VICTORY} game_state_enum;
+typedef enum entity_status {ALIVE, DEAD} entity_status;
 
 typedef struct player_struct{
 	uint16_t x,y;
@@ -27,7 +28,8 @@ typedef struct player_struct{
 
 typedef struct ghost_struct{
 	int x,y;
-	entity hovering_entity;
+	tile_type hovering_tile_type;
+	entity_status status;
 } ghost_struct;
 
 
@@ -43,6 +45,7 @@ void init_ghost();
 
 void move_player();
 void move_ghost();
+void increase_score(int value);
 
 
 #endif /* end __PACMAN_H */

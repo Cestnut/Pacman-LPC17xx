@@ -10,6 +10,8 @@
 #ifndef __TIMER_H
 #define __TIMER_H
 
+#include "LPC17xx.h"
+
 /* init_timer.c */
 extern uint32_t init_timer( uint8_t timer_num, uint32_t timerInterval );
 extern void enable_timer( uint8_t timer_num );

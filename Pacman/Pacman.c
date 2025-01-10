@@ -1,6 +1,7 @@
 #include "Pacman/Pacman.h"
 #include "GLCD/GLCD.h"
 #include <stdlib.h>     
+#include "config/config.h"
 
 player_struct player;
 ghost_struct ghost;
@@ -8,6 +9,11 @@ game_state_enum game_state;
 int eaten_pills = 0;
 extern int toggle_lives;
 extern int toggle_score;	
+extern int toggle_power_pill;	
+extern int ticks;
+extern int power_pill_tick;
+extern int ghost_death_tick; 
+int board_drawn_sound = 0, pill_eaten_sound = 0;
 
 char char_board[LABYRINTH_X_SIZE][LABYRINTH_Y_SIZE] = {	
 			"#############-###############",
@@ -126,7 +132,7 @@ char empty_pattern[TILE_X_SIZE][TILE_Y_SIZE] = {
 			"bbbbbbbbbb"
 };
 
-entity board[LABYRINTH_X_SIZE][LABYRINTH_Y_SIZE] = {{EMPTY}};
+tile_type board[LABYRINTH_X_SIZE][LABYRINTH_Y_SIZE] = {{EMPTY}};
 
 typedef struct coordinates{
 	int x, y;
@@ -239,6 +245,7 @@ void draw_board(){
 				}
 		}		
 	}
+	board_drawn_sound = 1;
 }
 
 void init_player(){
@@ -254,8 +261,9 @@ void init_player(){
 void init_ghost(){
 	ghost.x = 12;
 	ghost.y = 13;
-	ghost.hovering_entity = SPAWN;
+	ghost.hovering_tile_type = SPAWN;
 	board[ghost.x][ghost.y] = GHOST;
+	ghost.status = ALIVE;
 
 }
 
@@ -276,31 +284,46 @@ void move_player(){
 		case SPAWN:
 		case WALL: player.direction = STILL; break;
 		case STANDARD_PILL:
-				new_points = 10;
+				increase_score(STANDARD_PILL_VALUE);
 				moved_flag = 1;
 				eaten_pills++;
+				pill_eaten_sound = 1;
 				break;
 		case POWER_PILL:
-				new_points = 50;
+				increase_score(POWER_PILL_VALUE);
 				moved_flag = 1;
 				eaten_pills++;
 				player.status = SUPER;
+				power_pill_tick = ticks;
+				pill_eaten_sound = 1;
 				break;
 		case EMPTY: 
 				moved_flag = 1;
 				break;
 		case GHOST: 
-				if(player.status == NORMAL) game_state = GAME_OVER;
-				break;//gameover break;
-	}
-	
-	if(new_points!=0){
-		player.score += new_points;
-		toggle_score = 1;
-		if(!(player.score%1000)){
-					player.lives++;
+				if(player.status == SUPER){
+					increase_score(GHOST_VALUE);
+					init_ghost(); /*Puts ghost back to starting position*/
+					moved_flag = 1;
+					ghost.status = DEAD;
+					ghost_death_tick = ticks;
+					player.status = NORMAL;
+				}
+				else{
+					player.lives--;
 					toggle_lives = 1;
-		}
+					if(player.lives == 0){
+						game_state = GAME_OVER;
+					}
+					else{
+						draw_tile(ghost.x, ghost.y, empty_pattern);
+						init_ghost();
+						init_player();
+						draw_tile(player.x, player.y, pacman_pattern);
+						return;
+					}
+				};
+				break;
 	}
 	
 	if(moved_flag == 1){
@@ -316,6 +339,7 @@ void move_player(){
 }
 
 void move_ghost(){
+	if(ghost.status == DEAD) return;
 	int found_node_index = -1;
 	int j, k, z; /*Indexes used to iterate through the frontier*/
 	int already_explored_flag; /*When a valid node has been found, this flag is used to exclude nodes that have already been explored*/
@@ -330,82 +354,86 @@ void move_ghost(){
 	frontier_queue.head = 1;	
 	frontier_queue.tail = 0;
 
-	//For every node Until the queue isn't empty
-	while(frontier_queue.tail < frontier_queue.head && found_node_index == -1){
-		for(j=-1; j<=1 && found_node_index == -1; j++){
-			for(k=-1; k<=1 && found_node_index == -1; k++){
-				if(j != 0 && k != 0) continue; /*So diagonal squares get skipped*/
-				x = frontier_queue.nodes[frontier_queue.tail].coordinates.x + j;
-				y = frontier_queue.nodes[frontier_queue.tail].coordinates.y + k;
+	if(player.status == NORMAL){
+		while(frontier_queue.tail < frontier_queue.head && found_node_index == -1){
+			for(j=-1; j<=1 && found_node_index == -1; j++){
+				for(k=-1; k<=1 && found_node_index == -1; k++){
+					if(j != 0 && k != 0) continue; /*So diagonal squares get skipped*/
+					x = frontier_queue.nodes[frontier_queue.tail].coordinates.x + j; /*x to explore*/
+					y = frontier_queue.nodes[frontier_queue.tail].coordinates.y + k; /*y to explore*/
 				
-				/*To warp to both ends of the labyrinth*/
-				if(x == -1) x = LABYRINTH_X_SIZE - 1;
-				if(x == LABYRINTH_X_SIZE) x = 0;
+					/*To warp to both ends of the labyrinth*/
+					if(x == -1) x = LABYRINTH_X_SIZE - 1;
+					if(x == LABYRINTH_X_SIZE) x = 0;
+					if(board[x][y] != WALL){
+						/*Check if the node has already been explored*/
+						already_explored_flag=0;
+						for(z=0; z<frontier_queue.head; z++){
+							if(frontier_queue.nodes[z].coordinates.x == x && frontier_queue.nodes[z].coordinates.y == y){
+								already_explored_flag = 1;
+								break;
+							}
+						}
 
-				if(board[x][y] != WALL){
-					/*Check if the node has already been explored*/
-					already_explored_flag=0;
-					for(z=0; z<frontier_queue.head; z++){
-						if(frontier_queue.nodes[z].coordinates.x == x && frontier_queue.nodes[z].coordinates.y == y){
-							already_explored_flag = 1;
-							break;
+						/*If the node hasn't already been explored*/
+						if(!already_explored_flag){
+							/*Insert new node in frontier*/
+							frontier_queue.nodes[frontier_queue.head].coordinates.x = x;
+							frontier_queue.nodes[frontier_queue.head].coordinates.y = y;
+							frontier_queue.nodes[frontier_queue.head].father = frontier_queue.tail;
+							frontier_queue.nodes[frontier_queue.head].depth = frontier_queue.nodes[frontier_queue.tail].depth + 1 ; /*This line sets the depth to that of the father +1*/
+
+							if(board[x][y] == PACMAN){
+								found_node_index = frontier_queue.head;
+							}
+
+							frontier_queue.head++;
 						}
 					}
-
-					/*If the node hasn't already been explored*/
-					if(!already_explored_flag){
-						/*Insert new node in frontier*/
-						frontier_queue.nodes[frontier_queue.head].coordinates.x = x;
-						frontier_queue.nodes[frontier_queue.head].coordinates.y = y;
-						frontier_queue.nodes[frontier_queue.head].father = frontier_queue.tail;
-						frontier_queue.nodes[frontier_queue.head].depth = frontier_queue.nodes[frontier_queue.tail].depth + 1 ; /*This line sets the depth to that of the father +1*/
-						
-						if(board[x][y] == PACMAN){
-							found_node_index = frontier_queue.head;
-						}
-					
-						frontier_queue.head++;
-					}
 				}
-			}
+			}	
+			frontier_queue.tail++;
 		}
-		frontier_queue.tail++;
-	}
-
-	if(found_node_index != -1){ /*Checks if a node has been found. This should always be the case*/
 		
-		/*If the player status is super, the destination of the ghost isnt pacman but the furthest tile from pacman among those at his same depth*/
-		if(player.status==SUPER){
-			int max_distance = 0, tmp_x, tmp_y, tmp_distance;
-			int new_destination_index=found_node_index; /*This is initialized to found node in case no nodes at the same depth are found. (In that case the ghost moves towards pacman)*/
-			for(j=0; j<frontier_queue.head; j++){
-				if(j==found_node_index) continue; /*So ghost doesnt go for pacman position*/
-				if(frontier_queue.nodes[j].depth == frontier_queue.nodes[found_node_index].depth || frontier_queue.nodes[j].depth == frontier_queue.nodes[found_node_index].depth-1){
-					tmp_x = frontier_queue.nodes[j].coordinates.x - player.x;
-					tmp_y = frontier_queue.nodes[j].coordinates.y - player.y;
-					tmp_distance = tmp_x*tmp_x + tmp_y*tmp_y; /*Calculates air distance between pacman and tile */
-		
-					if(tmp_distance>max_distance){
-						max_distance = tmp_distance;
-						new_destination_index = j;
-					}
-				}
-			}
-			found_node_index = new_destination_index;
-		}
-		/*If the father's index is 0 it means the father position is the ghost one*/
 		while(frontier_queue.nodes[found_node_index].father != 0){
 			found_node_index = frontier_queue.nodes[found_node_index].father;
 		}
-
 		//Here we have the new coordinates
 		x = frontier_queue.nodes[found_node_index].coordinates.x;
 		y = frontier_queue.nodes[found_node_index].coordinates.y;
+	}
+	else if(player.status == SUPER){
+		int max_distance = 0, tmp_distance=0, new_x, new_y;
+		for(j=-1; j<=1 && found_node_index == -1; j++){
+				for(k=-1; k<=1 && found_node_index == -1; k++){
+					if(j != 0 && k != 0) continue; /*So diagonal squares get skipped*/
+					new_x = ghost.x + j; /*x to explore*/
+					new_y = ghost.y + k; /*y to explore*/
+				
+					/*To warp to both ends of the labyrinth*/
+					if(new_x == -1) new_x = LABYRINTH_X_SIZE - 1;
+					if(new_x == LABYRINTH_X_SIZE) new_x = 0;
+					if(board[new_x][new_y] != WALL && board[new_x][new_y] != SPAWN){
+						/*Calculates the distance of the current chosen tile from pacman*/
+						tmp_distance = (new_x-player.x)*(new_x-player.x) + (new_y-player.y)*(new_y-player.y);
+						if(tmp_distance > max_distance){
+							max_distance = tmp_distance;
+							x = new_x;
+							y = new_y;
+						}
+					}
+			}
+		}
+	}
+	//For every node Until the queue isn't empty
+
+
+	if(x!=ghost.x || y!=ghost.y){ /*Checks if a new position has been found. This should always be the case*/
 
 		if(player.status==NORMAL) draw_tile(x,y, ghost_chasing_pattern);
 		else if(player.status == SUPER) draw_tile(x,y, ghost_scared_pattern);
 		
-		switch (ghost.hovering_entity)
+		switch (ghost.hovering_tile_type)
 		{
 		case SPAWN:
 		case EMPTY:
@@ -420,16 +448,53 @@ void move_ghost(){
 		default:
 			break;
 		}
-
-		if(board[x][y] == PACMAN){
-			game_state = GAME_OVER;
-		}
-
-		board[ghost.x][ghost.y] = ghost.hovering_entity;
-		ghost.hovering_entity = board[x][y];
+		
+		board[ghost.x][ghost.y] = ghost.hovering_tile_type;
+		ghost.hovering_tile_type = board[x][y];
 		board[x][y] = GHOST;		
 
 		ghost.x = x; 
 		ghost.y = y;
+	
+		if(ghost.x == player.x && ghost.y == player.y){
+			if(player.status == SUPER){
+				init_ghost();
+				ghost.status = DEAD;
+				ghost_death_tick = ticks;
+				increase_score(GHOST_VALUE);
+			}
+			else if(player.status == NORMAL){
+				player.lives--;
+				toggle_lives = 1;
+				if(player.lives == 0){
+					game_state = GAME_OVER;
+				}
+				else{
+					draw_tile(ghost.x, ghost.y, empty_pattern);
+					init_ghost();
+					init_player();
+					draw_tile(player.x, player.y, pacman_pattern);
+					return;
+				}
+			}
+		}
+	
 	}
+}
+
+void increase_score(int value){
+	int floored_new_score, floored_old_score;
+	toggle_score = 1;
+	
+	floored_new_score = (int)((player.score+value)/1000);
+	if(floored_new_score > (player.score+value)/1000) floored_new_score -= 1;
+
+	floored_old_score = (int)(player.score / 1000);
+	if(floored_old_score > (player.score / 1000)) floored_old_score -= 1;
+
+	if(floored_new_score > floored_old_score){ /*If the player has surpassed the 1000 points threshold*/
+		player.lives++;
+		toggle_lives = 1;
+	}
+	player.score += value;
 }
