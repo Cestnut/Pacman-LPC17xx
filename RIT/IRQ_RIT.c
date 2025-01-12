@@ -66,47 +66,6 @@ NOTE starting_song[] =
 	{d3, time_semicroma},
 	{f3, time_semicroma},
 	{g3, time_semicroma},
-	// 2
-	{c3, time_semicroma},
-	{c3, time_semicroma},
-	{d4, time_croma},
-	{a3, time_croma},
-	{pause, time_semicroma},
-	{a3b, time_semicroma},
-	{pause, time_semicroma},
-	{g3, time_croma},
-	{f3, time_semicroma*2},
-	{d3, time_semicroma},
-	{f3, time_semicroma},
-	{g3, time_semicroma},
-	// 3
-	{c3b, time_semicroma},
-	{c3b, time_semicroma},
-	{d4, time_croma},
-	{a3, time_croma},
-	{pause, time_semicroma},
-	{a3b, time_semicroma},
-	{pause, time_semicroma},
-	{g3, time_croma},
-	{f3, time_semicroma*2},
-	{d3, time_semicroma},
-	{f3, time_semicroma},
-	{g3, time_semicroma},
-	// 4
-	{a2b, time_semicroma},
-	{a2b, time_semicroma},
-	{d4, time_croma},
-	{a3, time_croma},
-	{pause, time_semicroma},
-	{a3b, time_semicroma},
-	{pause, time_semicroma},
-	{g3, time_croma},
-	{f3, time_semicroma*2},
-	{d3, time_semicroma},
-	{f3, time_semicroma},
-	{g3, time_semicroma},
-	// 5
-	
 };
 
 NOTE eating_sound[] = {

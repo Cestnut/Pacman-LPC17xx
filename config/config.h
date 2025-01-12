@@ -5,3 +5,6 @@
 #define GHOST_VALUE 100
 #define STANDARD_PILL_VALUE 10
 #define POWER_PILL_VALUE 50
+
+#define POWER_PILL_GENERATION_MIN_TICKS 40 /*After how many ticks at min a new power pill should be generated*/
+#define POWER_PILL_GENERATION_MAX_TICKS 60 /*After how many ticks at max a new power pill should be generated*/

@@ -15,7 +15,9 @@
 #include "Pacman/Pacman.h"
 #include "config/config.h"
 #include <stdio.h> /*for sprintf*/
-#include "CAN/CAN.h"                                 
+#include "CAN/CAN.h"     
+#include <stdlib.h>     
+
 /* LPC17xx CAN adaption layer */
 /******************************************************************************
 ** Function name:		Timer0_IRQHandler
@@ -40,6 +42,7 @@ int ticks=1;
 int seconds=MAX_TIME;
 int power_pill_tick; /*The tick in which pacman has eaten the power pill*/
 int ghost_death_tick; /*The tick in which the ghost has died*/
+int new_power_pill_generation_tick;
 
 extern int board_drawn_sound;
 custom_data CAN_data;
@@ -56,6 +59,7 @@ void TIMER0_IRQHandler (void)
 			generate_standard_pills();
 			GUI_Text(0, 300, (uint8_t *)string, White, Black);	
 			toggle_beginning = 0;
+			new_power_pill_generation_tick = (rand()%(POWER_PILL_GENERATION_MAX_TICKS-POWER_PILL_GENERATION_MIN_TICKS))+POWER_PILL_GENERATION_MIN_TICKS;
 		}
 		if(toggle_pause_flag){
 			GUI_Text(100, 130, (uint8_t *) "     ", Yellow, Black);
@@ -75,9 +79,10 @@ void TIMER0_IRQHandler (void)
 			#endif
 		}
 		
-		if(!(ticks%50) && generated_power_pills < POWER_PILLS_NUMBER){
+		if((ticks == new_power_pill_generation_tick) && generated_power_pills < POWER_PILLS_NUMBER){
 			generate_power_pill();
 			generated_power_pills++;
+			new_power_pill_generation_tick = ticks + (rand()%(POWER_PILL_GENERATION_MAX_TICKS-POWER_PILL_GENERATION_MIN_TICKS))+POWER_PILL_GENERATION_MIN_TICKS;
 		}
 		
 		if(toggle_lives){
